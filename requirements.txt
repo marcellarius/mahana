@@ -1,0 +1,6 @@
+click==6
+temperusb
+requests
+flask
+psycopg2
+python-dateutil
