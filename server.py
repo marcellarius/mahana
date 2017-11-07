@@ -3,7 +3,7 @@ import psycopg2
 import psycopg2.extras
 import dateutil.parser
 from werkzeug.local import LocalProxy
-from flask import g, request, jsonify
+from flask import g, request, jsonify, render_template
 
 import json_encoder
 
@@ -64,6 +64,12 @@ def get_datapoints(sensor_name):
     for row in cursor:
         yield (row.sample_time, row.temperature)
 
+@app.route("/graph/<sensor_name>")
+def graph_sensor(sensor_name):
+    return render_template(
+        "graph.html",
+        sensor_name=sensor_name)
+
 @app.route("/api/<sensor_name>", methods=["GET", "POST"])
 def api_sensor(sensor_name):
     if request.method == "GET":
@@ -75,5 +81,5 @@ def api_sensor(sensor_name):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    app.run(host="0.0.0.0", port=8900)
 

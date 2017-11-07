@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+
+<html>
+	<head>
+		<link rel="stylesheet" href="{{url_for('static', filename='dygraph.css')}}">
+	</head>
+	<body>
+		<div id="div_g" style="width:100%px; height:300px;"></div>
+		<script src="{{url_for('static', filename='jquery-3.2.1.min.js')}}"></script>
+		<script src="{{url_for('static', filename='dygraph.min.js')}}"></script>
+		<script>
+			$(function() {
+				var data = [];
+				var g = new Dygraph(document.getElementById("div_g"), data,
+				{
+					drawPoints: true,
+					showRoller: true,
+					valueRange: [10.0, 30.0],
+					labels: ['Time', 'Temperature']
+				});
+
+				function translateData(jsonData) {
+					for (var i = 0; i < jsonData.length; i++) {
+						var datapoint = jsonData[i];
+						datapoint[0] = new Date(datapoint[0]);
+						datapoint[1] = parseFloat(datapoint[1]);
+					}
+					console.log(jsonData);
+					return jsonData;
+				}
+
+				function fetchData() {
+					fetch({{url_for('api_sensor', sensor_name=sensor_name)|tojson|safe}}).then(function (response) {
+						var jsonData = response.json().then(function (json) {
+							g.updateOptions({file: translateData(json)});
+						});
+					});
+				}
+
+				setInterval(fetchData, 1000);
+			});
+		</script>
+	</body>
+</html>
