@@ -5,7 +5,7 @@
 		<link rel="stylesheet" href="{{url_for('static', filename='dygraph.css')}}">
 	</head>
 	<body>
-		<div id="div_g" style="width:100%px; height:300px;"></div>
+		<div id="div_g" style="width:100%px; height:800px;"></div>
 		<script src="{{url_for('static', filename='jquery-3.2.1.min.js')}}"></script>
 		<script src="{{url_for('static', filename='dygraph.min.js')}}"></script>
 		<script>
@@ -15,7 +15,7 @@
 				{
 					drawPoints: true,
 					showRoller: true,
-					valueRange: [10.0, 30.0],
+					valueRange: [15.0, 30.0],
 					labels: ['Time', 'Temperature']
 				});
 
