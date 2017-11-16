@@ -1,7 +1,11 @@
+import click
+import csv
 import flask
 import psycopg2
 import psycopg2.extras
 import dateutil.parser
+import datetime
+from tzlocal import get_localzone
 from werkzeug.local import LocalProxy
 from flask import g, request, jsonify, render_template
 
@@ -51,14 +55,18 @@ def save_datapoints(sensor_name, data_points):
 def get_datapoints(sensor_name):
     cursor = db.cursor()
     cursor.execute("""
-        SELECT 
-            sample_time, temperature
+        SELECT sample_time, temperature
         FROM
-            temperature_samples
-        WHERE
-            sensor_name = %s
-        ORDER BY
-            sample_time ASC
+            (SELECT 
+                sample_time, temperature,
+                row_number() OVER (ORDER BY id ASC) as row_number
+            FROM
+                temperature_samples
+            WHERE
+                sensor_name = %s
+            ORDER BY
+                sample_time ASC) as t
+        WHERE t.row_number %% 10 = 0
     """, [sensor_name])
 
     for row in cursor:
@@ -76,10 +84,32 @@ def api_sensor(sensor_name):
         return jsonify(list(get_datapoints(sensor_name)))
     else:
         json = request.get_json()
-        save_datapoints(sensor_name, ((dateutil.parser.parse(ts), temperature) for ts, temperature in json))
+        save_datapoints(sensor_name, ((dateutil.parser.parse(ts).replace(tzinfo=datetime.timezone.utc), temperature) for ts, temperature in json))
         return "OK", 200
 
+@click.group()
+def cli():
+    pass
+
+
+@cli.command("csv")
+@click.argument('sensor', type=str)
+@click.argument('csvfile', type=click.File('w'))
+def dump_csv(sensor, csvfile):
+    local_tz = get_localzone()
+    with app.app_context():
+        data = get_datapoints(sensor)
+        with csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow(['Time', 'Temperature'])
+            for ts, temp in data:
+                csvwriter.writerow([ts.astimezone(local_tz).strftime("%Y-%m-%d %H:%M:%S"), temp])
+        
+
+@cli.command()
+@click.option("--port", default=8900, help="The port to use")
+def run(port=8900):
+    app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8900)
-
+	cli()
