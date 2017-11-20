@@ -4,7 +4,7 @@ import flask
 import psycopg2
 import psycopg2.extras
 import dateutil.parser
-import datetime
+from datetime import datetime, timedelta, timezone
 from tzlocal import get_localzone
 from werkzeug.local import LocalProxy
 from flask import g, request, jsonify, render_template
@@ -52,7 +52,7 @@ def save_datapoints(sensor_name, data_points):
             [sensor_name, dp[0], dp[1]]);
 
 
-def get_datapoints(sensor_name):
+def get_datapoints(sensor_name, start_timestamp=None):
     cursor = db.cursor()
     cursor.execute("""
         SELECT sample_time, temperature
@@ -63,11 +63,17 @@ def get_datapoints(sensor_name):
             FROM
                 temperature_samples
             WHERE
-                sensor_name = %s
+                sensor_name = %(sensor_name)s
             ORDER BY
                 sample_time ASC) as t
-        WHERE t.row_number %% 10 = 0
-    """, [sensor_name])
+        WHERE 
+            t.row_number %% %(take_every)s = 0
+            AND (%(start_timestamp)s IS NULL OR t.sample_time > %(start_timestamp)s)
+    """, {
+        "sensor_name": sensor_name,
+        "start_timestamp": start_timestamp,
+        "take_every": 10
+    })
 
     for row in cursor:
         yield (row.sample_time, row.temperature)
@@ -76,15 +82,18 @@ def get_datapoints(sensor_name):
 def graph_sensor(sensor_name):
     return render_template(
         "graph.html",
-        sensor_name=sensor_name)
+        sensor_name=sensor_name,
+        days_to_fetch=request.args.get("days", 7, int))
 
 @app.route("/api/<sensor_name>", methods=["GET", "POST"])
 def api_sensor(sensor_name):
     if request.method == "GET":
-        return jsonify(list(get_datapoints(sensor_name)))
+        days_to_fetch = request.args.get("days", 7, int)
+        start_timestamp = datetime.now() - timedelta(days=days_to_fetch)
+        return jsonify(list(get_datapoints(sensor_name, start_timestamp=start_timestamp)))
     else:
         json = request.get_json()
-        save_datapoints(sensor_name, ((dateutil.parser.parse(ts).replace(tzinfo=datetime.timezone.utc), temperature) for ts, temperature in json))
+        save_datapoints(sensor_name, ((dateutil.parser.parse(ts).replace(tzinfo=timezone.utc), temperature) for ts, temperature in json))
         return "OK", 200
 
 @click.group()

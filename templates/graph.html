@@ -30,7 +30,7 @@
 				}
 
 				function fetchData() {
-					fetch({{url_for('api_sensor', sensor_name=sensor_name)|tojson|safe}}).then(function (response) {
+					fetch({{url_for('api_sensor', sensor_name=sensor_name, days=days_to_fetch)|tojson|safe}}).then(function (response) {
 						var jsonData = response.json().then(function (json) {
 							g.updateOptions({file: translateData(json)});
 						});
